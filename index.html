@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Whisper demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js" integrity="sha512-aVKKRRi/Q/YV+4mjoKBsE4x3H+BkegoM/em46NNlCqNTmUYADjBbeNefNxYV7giUp0VxICtqdrbqU7iVaeZNXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+    <style>
+        #record {
+            margin-top: -50px
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <header>
+            <h1>Whisper demo</h1>
+        </header>
+
+        Hold the record button, then speak to view the resulting predicted transcript<br>
+        <canvas class="visualizer" height="60px"></canvas>
+        <button id="record" class="btn btn-primary"><i class="bi bi-mic"></i> Record</button>
+        <div id="result"></div>
+        API docs: <a href="https://asr.auckland-cer.cloud.edu.au/docs">https://asr.auckland-cer.cloud.edu.au/docs</a>
+    </div>
+    <script>
+
+        // Based on https://github.com/mdn/dom-examples/tree/main/media/web-dictaphone
+
+        // visualiser setup - create web audio api context and canvas
+
+        let audioCtx;
+        const canvas = document.querySelector('.visualizer');
+        const canvasCtx = canvas.getContext("2d");
+
+        //main block for doing the audio recording
+
+        if (navigator.mediaDevices.getUserMedia) {
+            console.log('getUserMedia supported.');
+
+            let onSuccess = function (stream) {
+                const mediaRecorder = new MediaRecorder(stream);
+
+                visualize(stream);
+
+                $("#record").on("mousedown touchstart", function() {
+                    console.log("recording")
+                    mediaRecorder.start();
+                    $("#record").attr("class", "btn btn-danger")
+                    $("#record i").attr("class", "bi bi-mic-fill")
+                })
+
+                $(document).on("mouseup touchend", function() {
+                    if (mediaRecorder.state == "recording") {
+                        mediaRecorder.stop();
+                    }
+                })
+
+                mediaRecorder.ondataavailable = function (e) {
+                    console.log(e)
+                    $("#record").attr("class", "btn btn-primary")
+                    $("#record i").attr("class", "bi bi-mic")
+                    /*
+                    if (e.data.size < 5000) {
+                        $("#status").text("Audio too short - try speaking for longer")
+                        $(".results").empty()
+                        return
+                    }
+                    */
+                    var form = new FormData()
+                    form.append("audio_file", e.data);
+                    $("#result").text("Processing...")
+                    $.ajax({
+                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json",
+                        data: form,
+                        cache: false,
+                        processData: false,
+                        contentType: false,
+                        type: 'POST',
+                        success: function (response) {
+                            console.log(response)
+                            $("#result").text(response)
+                        },
+                        error: function(e, textStatus, errorThrown) {
+                            $("#result").text(errorThrown)
+                        }
+                    });
+                }
+            }
+
+            let onError = function (err) {
+                console.log('The following error occured: ' + err);
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(onSuccess, onError);
+
+        } else {
+            console.log('getUserMedia not supported on your browser!');
+        }
+
+        function visualize(stream) {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+
+            const source = audioCtx.createMediaStreamSource(stream);
+
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            source.connect(analyser);
+            //analyser.connect(audioCtx.destination);
+
+            draw()
+
+            function draw() {
+                const WIDTH = canvas.width
+                const HEIGHT = canvas.height;
+
+                requestAnimationFrame(draw);
+
+                analyser.getByteTimeDomainData(dataArray);
+
+                canvasCtx.fillStyle = 'rgb(200, 200, 200)';
+                canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
+
+                canvasCtx.beginPath();
+
+                let sliceWidth = WIDTH * 1.0 / bufferLength;
+                let x = 0;
+
+
+                for (let i = 0; i < bufferLength; i++) {
+
+                    let v = dataArray[i] / 128.0;
+                    let y = v * HEIGHT / 2;
+
+                    if (i === 0) {
+                        canvasCtx.moveTo(x, y);
+                    } else {
+                        canvasCtx.lineTo(x, y);
+                    }
+
+                    x += sliceWidth;
+                }
+
+                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.stroke();
+
+            }
+        }
+    </script>
+
+</body>
+
+</html>
