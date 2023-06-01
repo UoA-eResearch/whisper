@@ -66,13 +66,10 @@
                     console.log(e)
                     $("#record").attr("class", "btn btn-primary")
                     $("#record i").attr("class", "bi bi-mic")
-                    /*
                     if (e.data.size < 5000) {
-                        $("#status").text("Audio too short - try speaking for longer")
-                        $(".results").empty()
+                        $("#result").text("Audio too short - try speaking for longer")
                         return
                     }
-                    */
                     var form = new FormData()
                     form.append("audio_file", e.data);
                     $("#result").text("Processing...")
