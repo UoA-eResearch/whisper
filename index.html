@@ -81,8 +81,13 @@
                         contentType: false,
                         type: 'POST',
                         success: function (response) {
+                            response = JSON.parse(response)
                             console.log(response)
-                            $("#result").text(response)
+                            $("#result").html(`
+                                Detected language: ${response.language}<br>
+                                Transcript: ${response.text}<br><br>
+                                Raw JSON: ${JSON.stringify(response)}
+                            `)
                         },
                         error: function(e, textStatus, errorThrown) {
                             $("#result").text(errorThrown)
