@@ -26,7 +26,8 @@
         Hold the record button, then speak to view the resulting predicted transcript<br>
         <canvas class="visualizer" height="60px"></canvas>
         <button id="record" class="btn btn-primary"><i class="bi bi-mic"></i> Record</button>
-        <div id="result"></div>
+        <div id="result"></div><br>
+        <div id="translation"></div>
         API docs: <a href="https://asr.auckland-cer.cloud.edu.au/docs">https://asr.auckland-cer.cloud.edu.au/docs</a>
     </div>
     <script>
@@ -76,21 +77,40 @@
                     $.ajax({
                         url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json",
                         data: form,
+                        type: 'POST',
                         cache: false,
                         processData: false,
                         contentType: false,
-                        type: 'POST',
                         success: function (response) {
                             response = JSON.parse(response)
                             console.log(response)
                             $("#result").html(`
                                 Detected language: ${response.language}<br>
                                 Transcript: ${response.text}<br><br>
-                                Raw JSON: ${JSON.stringify(response)}
+                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
                             `)
                         },
                         error: function(e, textStatus, errorThrown) {
                             $("#result").text(errorThrown)
+                        }
+                    });
+                    $.ajax({
+                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&task=translate",
+                        data: form,
+                        type: 'POST',
+                        cache: false,
+                        processData: false,
+                        contentType: false,
+                        success: function (response) {
+                            response = JSON.parse(response)
+                            console.log(response)
+                            $("#translation").html(`
+                                Translation: ${response.text}<br><br>
+                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
+                            `)
+                        },
+                        error: function(e, textStatus, errorThrown) {
+                            $("#translation").text(errorThrown)
                         }
                     });
                 }
