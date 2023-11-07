@@ -32,6 +32,13 @@
     </div>
     <script>
 
+        $.ajax("https://asr.auckland-cer.cloud.edu.au/asr", {
+            timeout: 2000,
+            error: function(e, textStatus, errorThrown) {
+                $("#result").text(`ERROR: ${textStatus}. Unable to reach https://asr.auckland-cer.cloud.edu.au/asr - is the server running?`)
+            }
+        })
+
         // Based on https://github.com/mdn/dom-examples/tree/main/media/web-dictaphone
 
         // visualiser setup - create web audio api context and canvas
