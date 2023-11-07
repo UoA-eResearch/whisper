@@ -32,10 +32,10 @@
     </div>
     <script>
 
-        $.ajax("https://asr.auckland-cer.cloud.edu.au/asr", {
+        $.ajax("https://asr.auckland-cer.cloud.edu.au/docs", {
             timeout: 2000,
             error: function(e, textStatus, errorThrown) {
-                $("#result").text(`ERROR: ${textStatus}. Unable to reach https://asr.auckland-cer.cloud.edu.au/asr - is the server running?`)
+                $("#result").text(`ERROR: ${textStatus}. Unable to reach https://asr.auckland-cer.cloud.edu.au/docs - is the server running?`)
             }
         })
 
