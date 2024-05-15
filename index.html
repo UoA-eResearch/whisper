@@ -10,7 +10,24 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
     <style>
         #record {
-            margin-top: -50px
+            border-radius: 50%;
+            width: 300px;
+            height: 300px;
+            margin: auto;
+            display: block;
+            left: 0;
+            right: 0;
+	        text-align: center;
+            position: absolute;
+            bottom: 50px;
+        }
+        .visualizer {
+            display: block;
+            text-align: center;
+            margin: auto;
+            margin-top: 10px;
+            max-width: 60%;
+            height: 60px;
         }
     </style>
 </head>
@@ -24,8 +41,10 @@
         </header>
 
         Hold the record button, then speak to view the resulting predicted transcript<br>
-        <canvas class="visualizer" height="60px"></canvas>
-        <button id="record" class="btn btn-primary"><i class="bi bi-mic"></i> Record</button>
+        <button id="record" class="btn btn-primary">
+            <i class="bi bi-mic"></i> Record
+            <canvas class="visualizer" height="60px"></canvas>
+        </button>
         <div id="result"></div><br>
         <div id="translation"></div>
         API docs: <a href="https://asr.auckland-cer.cloud.edu.au/docs">https://asr.auckland-cer.cloud.edu.au/docs</a>
