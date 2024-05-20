@@ -70,7 +70,9 @@
                     `)
                 },
                 error: function(e, textStatus, errorThrown) {
-                    $("#result").text(errorThrown)
+                    $("#result").html(`<div class="alert alert-danger" role="alert">
+                                            ${e.responseJSON.detail}
+                                        </div>`);
                 }
             });
         });
@@ -78,7 +80,9 @@
         $.ajax(BASE_URL + "docs", {
             timeout: 2000,
             error: function(e, textStatus, errorThrown) {
-                $("#result").text(`ERROR: ${textStatus}. Unable to reach ${BASE_URL} - is the server running?`)
+                $("#result").html(`<div class="alert alert-danger" role="alert">
+                                        ERROR: ${textStatus}. Unable to reach ${BASE_URL} - is the server running?
+                                    </div>`);
             }
         })
 
