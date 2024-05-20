@@ -50,6 +50,7 @@
 
         const BASE_URL = "https://a100.auckland-cer.cloud.edu.au/"
         $("#upload").change(function() {
+            if (!this.files[0]) return;
             var form = new FormData()
             form.append("audio", this.files[0]);
             $("#result").text("Processing...")
