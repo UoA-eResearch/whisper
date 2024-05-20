@@ -11,15 +11,11 @@
     <style>
         #record {
             border-radius: 50%;
-            width: 300px;
-            height: 300px;
+            width: 200px;
+            height: 200px;
             margin: auto;
             display: block;
-            left: 0;
-            right: 0;
 	        text-align: center;
-            position: absolute;
-            bottom: 50px;
         }
         .visualizer {
             display: block;
@@ -40,21 +36,49 @@
             <h1>Whisper demo</h1>
         </header>
 
-        Hold the record button, then speak to view the resulting predicted transcript<br>
+        Hold the record button or spacebar, then speak to view the resulting predicted transcript<br>
         <button id="record" class="btn btn-primary">
             <i class="bi bi-mic"></i> Record
             <canvas class="visualizer" height="60px"></canvas>
         </button>
+        Or upload a file here: <input id="upload" type="file">
         <div id="result"></div><br>
         <div id="translation"></div>
-        API docs: <a href="https://asr.auckland-cer.cloud.edu.au/docs">https://asr.auckland-cer.cloud.edu.au/docs</a>
+        API docs: <a href="https://a100.auckland-cer.cloud.edu.au/docs">https://a100.auckland-cer.cloud.edu.au/docs</a>
     </div>
     <script>
 
-        $.ajax("https://asr.auckland-cer.cloud.edu.au/docs", {
+        const BASE_URL = "https://a100.auckland-cer.cloud.edu.au/"
+        $("#upload").change(function() {
+            var form = new FormData()
+            form.append("audio", this.files[0]);
+            $("#result").text("Processing...")
+            var startTime = new Date().getTime()
+            $.ajax({
+                url: BASE_URL + "upload",
+                data: form,
+                type: 'POST',
+                cache: false,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    console.log(response)
+                    $("#result").html(`
+                        Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
+                        Transcript: ${response.output.text}<br><br>
+                        Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
+                    `)
+                },
+                error: function(e, textStatus, errorThrown) {
+                    $("#result").text(errorThrown)
+                }
+            });
+        });
+
+        $.ajax(BASE_URL + "docs", {
             timeout: 2000,
             error: function(e, textStatus, errorThrown) {
-                $("#result").text(`ERROR: ${textStatus}. Unable to reach https://asr.auckland-cer.cloud.edu.au/docs - is the server running?`)
+                $("#result").text(`ERROR: ${textStatus}. Unable to reach ${BASE_URL} - is the server running?`)
             }
         })
 
@@ -109,41 +133,39 @@
                         return
                     }
                     var form = new FormData()
-                    form.append("audio_file", e.data);
+                    form.append("audio", e.data);
                     $("#result").text("Processing...")
                     $.ajax({
-                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&vad_filter=true",
+                        url: BASE_URL + "upload",
                         data: form,
                         type: 'POST',
                         cache: false,
                         processData: false,
                         contentType: false,
                         success: function (response) {
-                            response = JSON.parse(response)
                             console.log(response)
                             $("#result").html(`
-                                Detected language: ${response.language}<br>
-                                Transcript: ${response.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
+                                Transcript: ${response.output.text}<br><br>
+                                Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
                             `)
                         },
                         error: function(e, textStatus, errorThrown) {
                             $("#result").text(errorThrown)
                         }
                     });
+                    form.append("task", "translate")
                     $.ajax({
-                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&task=translate&vad_filter=true",
+                        url: BASE_URL + "upload",
                         data: form,
                         type: 'POST',
                         cache: false,
                         processData: false,
                         contentType: false,
                         success: function (response) {
-                            response = JSON.parse(response)
                             console.log(response)
                             $("#translation").html(`
-                                Translation: ${response.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
+                                Translation: ${response.output.text}<br><br>
+                                Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
                             `)
                         },
                         error: function(e, textStatus, errorThrown) {
