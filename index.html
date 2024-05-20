@@ -140,6 +140,7 @@
                     var form = new FormData()
                     form.append("audio", e.data);
                     $("#result").text("Processing...")
+                    var startTime = new Date();
                     $.ajax({
                         url: BASE_URL + "upload",
                         data: form,
@@ -150,6 +151,7 @@
                         success: function (response) {
                             console.log(response)
                             $("#result").html(`
+                                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
                                 Transcript: ${response.output.text}<br><br>
                                 Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
                             `)
