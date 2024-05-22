@@ -48,11 +48,36 @@
     </div>
     <script>
 
+        var colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f']
+
+        function render(response) {
+            var html = `<table class="table">
+                            <tr>
+                                <th>Speaker</th>
+                                <th>Start time</th>
+                                <th>End time</th>
+                                <th>Transcript</th>
+                            </tr>`
+            for (var chunk of response.output.speakers) {
+                var speakerID = parseInt(chunk.speaker.replace("SPEAKER_", ""))
+                var color = colors[speakerID % colors.length] + "8f"
+                html += `<tr style="background-color:${color}">
+                            <td>${chunk.speaker}</td>
+                            <td>${chunk.timestamp[0]}</td>
+                            <td>${chunk.timestamp[1]}</td>
+                            <td>${chunk.text}</td>
+                         </tr>`
+            }
+            html += "</table>"
+            return html
+        }
+
         const BASE_URL = "https://a100.auckland-cer.cloud.edu.au/"
         $("#upload").change(function() {
             if (!this.files[0]) return;
             var form = new FormData()
             form.append("audio", this.files[0]);
+            form.append("diarise_audio", true);
             $("#result").text("Processing...")
             var startTime = new Date().getTime()
             $.ajax({
@@ -66,8 +91,7 @@
                     console.log(response)
                     $("#result").html(`
                         Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                        Transcript: ${response.output.text}<br><br>
-                        Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
+                        ${render(response)}<br><br>
                     `)
                 },
                 error: function(e, textStatus, errorThrown) {
