@@ -41,12 +41,120 @@
             <i class="bi bi-mic"></i> Record
             <canvas class="visualizer" height="60px"></canvas>
         </button>
-        Or upload a file here: <input id="upload" type="file"> Language: <input id="language" type="text"/>
+        Or upload a file here: <input id="upload" type="file"> Language: 
+        <select id="language"><option value="">auto</option></select>
+
         <div id="result"></div><br>
         <div id="translation"></div>
         API docs: <a href="https://a100.auckland-cer.cloud.edu.au/docs">https://a100.auckland-cer.cloud.edu.au/docs</a>
     </div>
     <script>
+        LANGUAGES = {
+            "en": "english",
+            "zh": "chinese",
+            "de": "german",
+            "es": "spanish",
+            "ru": "russian",
+            "ko": "korean",
+            "fr": "french",
+            "ja": "japanese",
+            "pt": "portuguese",
+            "tr": "turkish",
+            "pl": "polish",
+            "ca": "catalan",
+            "nl": "dutch",
+            "ar": "arabic",
+            "sv": "swedish",
+            "it": "italian",
+            "id": "indonesian",
+            "hi": "hindi",
+            "fi": "finnish",
+            "vi": "vietnamese",
+            "he": "hebrew",
+            "uk": "ukrainian",
+            "el": "greek",
+            "ms": "malay",
+            "cs": "czech",
+            "ro": "romanian",
+            "da": "danish",
+            "hu": "hungarian",
+            "ta": "tamil",
+            "no": "norwegian",
+            "th": "thai",
+            "ur": "urdu",
+            "hr": "croatian",
+            "bg": "bulgarian",
+            "lt": "lithuanian",
+            "la": "latin",
+            "mi": "maori",
+            "ml": "malayalam",
+            "cy": "welsh",
+            "sk": "slovak",
+            "te": "telugu",
+            "fa": "persian",
+            "lv": "latvian",
+            "bn": "bengali",
+            "sr": "serbian",
+            "az": "azerbaijani",
+            "sl": "slovenian",
+            "kn": "kannada",
+            "et": "estonian",
+            "mk": "macedonian",
+            "br": "breton",
+            "eu": "basque",
+            "is": "icelandic",
+            "hy": "armenian",
+            "ne": "nepali",
+            "mn": "mongolian",
+            "bs": "bosnian",
+            "kk": "kazakh",
+            "sq": "albanian",
+            "sw": "swahili",
+            "gl": "galician",
+            "mr": "marathi",
+            "pa": "punjabi",
+            "si": "sinhala",
+            "km": "khmer",
+            "sn": "shona",
+            "yo": "yoruba",
+            "so": "somali",
+            "af": "afrikaans",
+            "oc": "occitan",
+            "ka": "georgian",
+            "be": "belarusian",
+            "tg": "tajik",
+            "sd": "sindhi",
+            "gu": "gujarati",
+            "am": "amharic",
+            "yi": "yiddish",
+            "lo": "lao",
+            "uz": "uzbek",
+            "fo": "faroese",
+            "ht": "haitian creole",
+            "ps": "pashto",
+            "tk": "turkmen",
+            "nn": "nynorsk",
+            "mt": "maltese",
+            "sa": "sanskrit",
+            "lb": "luxembourgish",
+            "my": "myanmar",
+            "bo": "tibetan",
+            "tl": "tagalog",
+            "mg": "malagasy",
+            "as": "assamese",
+            "tt": "tatar",
+            "haw": "hawaiian",
+            "ln": "lingala",
+            "ha": "hausa",
+            "ba": "bashkir",
+            "jw": "javanese",
+            "su": "sundanese",
+            "yue": "cantonese",
+        }
+        var keysSorted = Object.keys(LANGUAGES).sort(function(a,b){return LANGUAGES[a].localeCompare(LANGUAGES[b])})
+        for (var k of keysSorted) {
+            $("#language").append(`<option value="${k}">${LANGUAGES[k]}</option>`)
+        }
 
         var colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f']
 
@@ -165,6 +273,7 @@
                     }
                     var form = new FormData()
                     form.append("audio", e.data);
+                    form.append("language", $("#language").val())
                     $("#result").text("Processing...")
                     var startTime = new Date();
                     $.ajax({
