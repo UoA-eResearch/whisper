@@ -41,7 +41,7 @@
             <i class="bi bi-mic"></i> Record
             <canvas class="visualizer" height="60px"></canvas>
         </button>
-        Or upload a file here: <input id="upload" type="file">
+        Or upload a file here: <input id="upload" type="file"> Language: <input id="language" type="text"/>
         <div id="result"></div><br>
         <div id="translation"></div>
         API docs: <a href="https://a100.auckland-cer.cloud.edu.au/docs">https://a100.auckland-cer.cloud.edu.au/docs</a>
@@ -78,6 +78,7 @@
             var form = new FormData()
             form.append("audio", this.files[0]);
             form.append("diarise_audio", true);
+            form.append("language", $("#language").val())
             $("#result").text("Processing...")
             var startTime = new Date().getTime()
             $.ajax({
