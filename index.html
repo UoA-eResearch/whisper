@@ -293,6 +293,7 @@
             $(document).keydown(function(event) {
                 if (event.code === 'Space') {
                     start()
+                    return false;
                 }
             })
             $(document).on("mouseup touchend", stop)
