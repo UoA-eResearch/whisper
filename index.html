@@ -272,42 +272,42 @@
                         return
                     }
                     var form = new FormData()
-                    form.append("audio", e.data);
-                    form.append("language", $("#language").val())
+                    form.append("audio_file", e.data);
                     $("#result").text("Processing...")
                     var startTime = new Date();
                     $.ajax({
-                        url: BASE_URL + "upload",
+                        url: BASE_URL + "whisper/asr?output=json&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
                         processData: false,
                         contentType: false,
                         success: function (response) {
+                            response = JSON.parse(response)
                             console.log(response)
                             $("#result").html(`
-                                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                                Transcript: ${response.output.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
+                                Detected language: ${response.language}<br>
+                                Transcript: ${response.text}<br><br>
+                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
                             `)
                         },
                         error: function(e, textStatus, errorThrown) {
                             $("#result").text(errorThrown)
                         }
                     });
-                    form.append("task", "translate")
                     $.ajax({
-                        url: BASE_URL + "upload",
+                        url: BASE_URL + "whisper/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
                         processData: false,
                         contentType: false,
                         success: function (response) {
+                            response = JSON.parse(response)
                             console.log(response)
                             $("#translation").html(`
-                                Translation: ${response.output.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response.output)}</code><br>
+                                Translation: ${response.text}<br><br>
+                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
                             `)
                         },
                         error: function(e, textStatus, errorThrown) {
