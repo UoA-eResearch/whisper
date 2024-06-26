@@ -42,11 +42,16 @@
             <canvas class="visualizer" height="60px"></canvas>
         </button>
         Or upload a file here: <input id="upload" type="file"> Language: 
-        <select id="language"><option value="">auto</option></select>
+        <select id="language"><option value="">auto</option></select><br>
+        Backend: <select id="backend">
+            <option value="https://asr.auckland-cer.cloud.edu.au/">faster-whisper + large-v3 + VAD</option>
+            <option value="https://a100.auckland-cer.cloud.edu.au/">insanely-fast-whisper + large-v3 (Transformers) (fp16 + batching [24] + Flash Attention 2 + diarization)</option>
+        </select>
 
         <div id="result"></div><br>
         <div id="translation"></div>
-        API docs: <a href="https://a100.auckland-cer.cloud.edu.au/docs">https://a100.auckland-cer.cloud.edu.au/docs</a>
+        <div id="docs">
+        </div>
     </div>
     <script>
         LANGUAGES = {
@@ -158,6 +163,14 @@
 
         var colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f']
 
+        function docs() {
+            var url = $("#backend").val()
+            $("#docs").html(`API docs: <a href="${url}docs">${url}docs</a>`)
+        }
+        docs()
+
+        $("#backend").change(docs)
+
         function render(response) {
             var html = `<table class="table">
                             <tr>
@@ -180,42 +193,69 @@
             return html
         }
 
-        const BASE_URL = "https://a100.auckland-cer.cloud.edu.au/"
         $("#upload").change(function() {
             if (!this.files[0]) return;
-            var form = new FormData()
-            form.append("audio", this.files[0]);
-            form.append("diarise_audio", true);
-            form.append("language", $("#language").val())
             $("#result").text("Processing...")
             var startTime = new Date().getTime()
-            $.ajax({
-                url: BASE_URL + "upload",
-                data: form,
-                type: 'POST',
-                cache: false,
-                processData: false,
-                contentType: false,
-                success: function (response) {
-                    console.log(response)
-                    $("#result").html(`
-                        Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                        ${render(response)}<br><br>
-                    `)
-                },
-                error: function(e, textStatus, errorThrown) {
-                    $("#result").html(`<div class="alert alert-danger" role="alert">
-                                            ${e.responseJSON.detail}
-                                        </div>`);
-                }
-            });
+            var url = $("#backend").val()
+            if (url == "https://asr.auckland-cer.cloud.edu.au/") {
+                var form = new FormData()
+                form.append("audio_file", this.files[0]);
+                $.ajax({
+                    url: url + "asr?output=json&vad_filter=true&language=" + $("#language").val(),
+                    data: form,
+                    type: 'POST',
+                    cache: false,
+                    processData: false,
+                    contentType: false,
+                    success: function (response) {
+                        response = JSON.parse(response)
+                        console.log(response)
+                        $("#result").html(`
+                            Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
+                            Detected language: ${response.language}<br>
+                            Transcript: ${response.text}<br><br>
+                            Raw JSON: <code>${JSON.stringify(response)}</code><br>
+                        `)
+                    },
+                    error: function(e, textStatus, errorThrown) {
+                        $("#result").text(errorThrown)
+                    }
+                });
+            } else if (url == "https://a100.auckland-cer.cloud.edu.au/") {
+                var form = new FormData()
+                form.append("audio", this.files[0]);
+                form.append("diarise_audio", true);
+                form.append("language", $("#language").val())
+                $.ajax({
+                    url: url + "upload",
+                    data: form,
+                    type: 'POST',
+                    cache: false,
+                    processData: false,
+                    contentType: false,
+                    success: function (response) {
+                        console.log(response)
+                        $("#result").html(`
+                            Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
+                            ${render(response)}<br><br>
+                        `)
+                    },
+                    error: function(e, textStatus, errorThrown) {
+                        $("#result").html(`<div class="alert alert-danger" role="alert">
+                                                ${e.responseJSON.detail}
+                                            </div>`);
+                    }
+                });
+            }
         });
 
-        $.ajax(BASE_URL + "docs", {
-            timeout: 2000,
+        var url = $("#backend").val()
+        $.ajax(url + "docs", {
+            timeout: 5000,
             error: function(e, textStatus, errorThrown) {
                 $("#result").html(`<div class="alert alert-danger" role="alert">
-                                        ERROR: ${textStatus}. Unable to reach ${BASE_URL} - is the server running?
+                                        ERROR: ${textStatus}. Unable to reach ${url} - is the server running?
                                     </div>`);
             }
         })
@@ -276,7 +316,7 @@
                     $("#result").text("Processing...")
                     var startTime = new Date();
                     $.ajax({
-                        url: BASE_URL + "whisper/asr?output=json&vad_filter=true&language=" + $("#language").val(),
+                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
@@ -296,7 +336,7 @@
                         }
                     });
                     $.ajax({
-                        url: BASE_URL + "whisper/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
+                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
