@@ -327,6 +327,7 @@
                             response = JSON.parse(response)
                             console.log(response)
                             $("#result").html(`
+                                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
                                 Detected language: ${response.language}<br>
                                 Transcript: ${response.text}<br><br>
                                 Raw JSON: <code>${JSON.stringify(response)}</code><br>
@@ -347,6 +348,7 @@
                             response = JSON.parse(response)
                             console.log(response)
                             $("#translation").html(`
+                                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
                                 Translation: ${response.text}<br><br>
                                 Raw JSON: <code>${JSON.stringify(response)}</code><br>
                             `)
