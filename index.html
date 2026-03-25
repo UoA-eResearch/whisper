@@ -45,7 +45,7 @@
         <select id="language"><option value="">auto</option></select><br>
         Backend: <select id="backend">
             <option value="https://asr.cer-sandbox.cloud.edu.au/">faster-whisper + large-v3 + VAD</option>
-            <option value="https://a100.auckland-cer.cloud.edu.au/">insanely-fast-whisper + large-v3 (Transformers) (fp16 + batching [24] + Flash Attention 2 + diarization)</option>
+            <option value="https://a100.cer-sandbox.cloud.edu.au/">insanely-fast-whisper + large-v3 (Transformers) (fp16 + batching [24] + Flash Attention 2 + diarization)</option>
         </select>
 
         <div id="result"></div><br>
@@ -198,7 +198,7 @@
             $("#result").text("Processing...")
             var startTime = new Date().getTime()
             var url = $("#backend").val()
-            if (url == "https://asr.auckland-cer.cloud.edu.au/") {
+            if (url == "https://asr.cer-sandbox.cloud.edu.au/") {
                 var form = new FormData()
                 form.append("audio_file", this.files[0]);
                 $.ajax({
@@ -222,7 +222,7 @@
                         $("#result").text(errorThrown)
                     }
                 });
-            } else if (url == "https://a100.auckland-cer.cloud.edu.au/") {
+            } else if (url == "https://a100.cer-sandbox.cloud.edu.au/") {
                 var form = new FormData()
                 form.append("audio", this.files[0]);
                 form.append("diarise_audio", true);
@@ -317,7 +317,7 @@
                     $("#result").text("Processing...")
                     var startTime = new Date();
                     $.ajax({
-                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&vad_filter=true&language=" + $("#language").val(),
+                        url: "https://asr.cer-sandbox.cloud.edu.au/asr?output=json&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
@@ -338,7 +338,7 @@
                         }
                     });
                     $.ajax({
-                        url: "https://asr.auckland-cer.cloud.edu.au/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
+                        url: "https://asr.cer-sandbox.cloud.edu.au/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
                         data: form,
                         type: 'POST',
                         cache: false,
