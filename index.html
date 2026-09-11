@@ -25,6 +25,13 @@
             max-width: 60%;
             height: 60px;
         }
+        #apikey {
+            width: 22em;
+            max-width: 100%;
+        }
+        #key-row {
+            margin: 1em 0;
+        }
     </style>
 </head>
 
@@ -36,17 +43,34 @@
             <h1>Whisper demo</h1>
         </header>
 
+        <p>
+            Transcription runs on the
+            <a href="https://console.groq.com/docs/speech-to-text">Groq speech-to-text API</a>
+            using <code>whisper-large-v3</code>.
+        </p>
+
+        <div id="key-row">
+            <label for="apikey">Groq API key:</label>
+            <input id="apikey" type="password" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+            <button id="savekey" class="btn btn-sm btn-primary">Save</button>
+            <button id="clearkey" class="btn btn-sm btn-outline-secondary">Forget</button>
+            <div id="key-status"></div>
+            <small class="text-muted">
+                Kept in this browser's local storage only, and sent nowhere except
+                <code>api.groq.com</code>. Create one at
+                <a href="https://console.groq.com/keys">console.groq.com/keys</a>.
+            </small>
+        </div>
+
         Hold the record button or spacebar, then speak to view the resulting predicted transcript<br>
         <button id="record" class="btn btn-primary">
             <i class="bi bi-mic"></i> Record
             <canvas class="visualizer" height="60px"></canvas>
         </button>
-        Or upload a file here: <input id="upload" type="file"> Language: 
-        <select id="language"><option value="">auto</option></select><br>
-        Backend: <select id="backend">
-            <option value="https://asr.cer-sandbox.cloud.edu.au/">faster-whisper + large-v3 + VAD</option>
-            <option value="https://a100.cer-sandbox.cloud.edu.au/">insanely-fast-whisper + large-v3 (Transformers) (fp16 + batching [24] + Flash Attention 2 + diarization)</option>
-        </select>
+        Or upload a file here:
+        <input id="upload" type="file" accept=".flac,.mp3,.mp4,.mpeg,.mpga,.m4a,.ogg,.wav,.webm,audio/*">
+        Language:
+        <select id="language"><option value="">auto</option></select>
 
         <div id="result"></div><br>
         <div id="translation"></div>
@@ -152,7 +176,7 @@
             "ln": "lingala",
             "ha": "hausa",
             "ba": "bashkir",
-            "jw": "javanese",
+            "jv": "javanese",
             "su": "sundanese",
             "yue": "cantonese",
         }
@@ -161,104 +185,205 @@
             $("#language").append(`<option value="${k}">${LANGUAGES[k]}</option>`)
         }
 
-        var colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f']
+        // https://console.groq.com/docs/speech-to-text
+        const GROQ_BASE = "https://api.groq.com/openai/v1"
+        const MODEL = "whisper-large-v3"
+        const KEY_STORAGE = "groqApiKey"
+        // 25 MB on the free tier, 100 MB on the dev tier
+        const MAX_BYTES = 25 * 1024 * 1024
+        // Groq picks the decoder from the filename, so a blob needs a plausible extension
+        const EXTENSIONS = ["flac", "mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "wav", "webm"]
 
-        function docs() {
-            var url = $("#backend").val()
-            $("#docs").html(`API docs: <a href="${url}docs">${url}docs</a>`)
+        function getKey() {
+            try {
+                return localStorage.getItem(KEY_STORAGE) || ""
+            } catch (e) {
+                return ""
+            }
         }
-        docs()
 
-        $("#backend").change(docs)
+        function storeKey(key) {
+            try {
+                if (key) {
+                    localStorage.setItem(KEY_STORAGE, key)
+                } else {
+                    localStorage.removeItem(KEY_STORAGE)
+                }
+            } catch (e) {
+                keyStatus("danger", "Could not save the key - local storage is unavailable in this browser.")
+            }
+        }
 
-        function render(response) {
-            var html = `<table class="table">
+        function keyStatus(level, message) {
+            $("#key-status").html(`<div class="alert alert-${level} py-1 my-2" role="alert">${escapeHtml(message)}</div>`)
+        }
+
+        function escapeHtml(text) {
+            return $("<div>").text(text === undefined || text === null ? "" : text).html()
+        }
+
+        function alertHtml(message) {
+            return `<div class="alert alert-danger" role="alert">${escapeHtml(message)}</div>`
+        }
+
+        // Groq reports failures as {"error": {"message": ..., "code": ...}}
+        function errorMessage(jqXHR, textStatus, errorThrown) {
+            var error = jqXHR && jqXHR.responseJSON && jqXHR.responseJSON.error
+            if (error && error.message) {
+                return error.message
+            }
+            if (jqXHR && jqXHR.status === 0) {
+                return "Could not reach api.groq.com - check your network connection."
+            }
+            return errorThrown || textStatus || "Unknown error"
+        }
+
+        function extensionFor(blob, mimeType) {
+            var subtype = String(mimeType || blob.type || "").split(";")[0].split("/").pop().toLowerCase()
+            return EXTENSIONS.includes(subtype) ? subtype : "webm"
+        }
+
+        function timestamp(seconds) {
+            if (typeof seconds !== "number") return ""
+            var minutes = Math.floor(seconds / 60)
+            return `${minutes}:${(seconds - minutes * 60).toFixed(1).padStart(4, "0")}`
+        }
+
+        // endpoint is "transcriptions" or "translations"; translations always render into English
+        // and take no language hint, so only transcriptions get one.
+        function groqRequest(endpoint, blob, filename, options) {
+            var form = new FormData()
+            form.append("file", blob, filename)
+            form.append("model", MODEL)
+            form.append("response_format", options.responseFormat || "json")
+            if (options.responseFormat === "verbose_json") {
+                form.append("timestamp_granularities[]", "segment")
+            }
+            // An empty language is rejected, so leave it off entirely to auto-detect
+            var language = $("#language").val()
+            if (language && endpoint === "transcriptions") {
+                form.append("language", language)
+            }
+            return $.ajax({
+                url: `${GROQ_BASE}/audio/${endpoint}`,
+                headers: { "Authorization": `Bearer ${getKey()}` },
+                data: form,
+                type: 'POST',
+                cache: false,
+                processData: false,
+                contentType: false
+            })
+        }
+
+        function renderSegments(response) {
+            if (!response.segments || !response.segments.length) {
+                return ""
+            }
+            var html = `<table class="table table-striped">
                             <tr>
-                                <th>Speaker</th>
                                 <th>Start time</th>
                                 <th>End time</th>
                                 <th>Transcript</th>
                             </tr>`
-            for (var chunk of response.output.speakers) {
-                var speakerID = parseInt(chunk.speaker.replace("SPEAKER_", ""))
-                var color = colors[speakerID % colors.length] + "8f"
-                html += `<tr style="background-color:${color}">
-                            <td>${chunk.speaker}</td>
-                            <td>${chunk.timestamp[0]}</td>
-                            <td>${chunk.timestamp[1]}</td>
-                            <td>${chunk.text}</td>
+            for (var segment of response.segments) {
+                html += `<tr>
+                            <td>${timestamp(segment.start)}</td>
+                            <td>${timestamp(segment.end)}</td>
+                            <td>${escapeHtml(segment.text)}</td>
                          </tr>`
             }
             html += "</table>"
             return html
         }
 
-        $("#upload").change(function() {
-            if (!this.files[0]) return;
-            $("#result").text("Processing...")
-            var startTime = new Date().getTime()
-            var url = $("#backend").val()
-            if (url == "https://asr.cer-sandbox.cloud.edu.au/") {
-                var form = new FormData()
-                form.append("audio_file", this.files[0]);
-                $.ajax({
-                    url: url + "asr?output=json&vad_filter=true&language=" + $("#language").val(),
-                    data: form,
-                    type: 'POST',
-                    cache: false,
-                    processData: false,
-                    contentType: false,
-                    success: function (response) {
-                        response = JSON.parse(response)
-                        console.log(response)
-                        $("#result").html(`
-                            Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                            Detected language: ${response.language}<br>
-                            Transcript: ${response.text}<br><br>
-                            Raw JSON: <code>${JSON.stringify(response)}</code><br>
-                        `)
-                    },
-                    error: function(e, textStatus, errorThrown) {
-                        $("#result").text(errorThrown)
-                    }
-                });
-            } else if (url == "https://a100.cer-sandbox.cloud.edu.au/") {
-                var form = new FormData()
-                form.append("audio", this.files[0]);
-                form.append("diarise_audio", true);
-                form.append("language", $("#language").val())
-                $.ajax({
-                    url: url + "upload",
-                    data: form,
-                    type: 'POST',
-                    cache: false,
-                    processData: false,
-                    contentType: false,
-                    success: function (response) {
-                        console.log(response)
-                        $("#result").html(`
-                            Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                            ${render(response)}<br><br>
-                        `)
-                    },
-                    error: function(e, textStatus, errorThrown) {
-                        $("#result").html(`<div class="alert alert-danger" role="alert">
-                                                ${e.responseJSON.detail}
-                                            </div>`);
-                    }
-                });
-            }
-        });
+        function renderTranscript(response, startTime) {
+            return `
+                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
+                Detected language: ${escapeHtml(response.language)}<br>
+                Transcript: ${escapeHtml(response.text)}<br><br>
+                ${renderSegments(response)}
+                Raw JSON: <code>${escapeHtml(JSON.stringify(response))}</code><br>
+            `
+        }
 
-        var url = $("#backend").val()
-        $.ajax(url + "docs", {
-            timeout: 5000,
-            error: function(e, textStatus, errorThrown) {
-                $("#result").html(`<div class="alert alert-danger" role="alert">
-                                        ERROR: ${textStatus}. Unable to reach ${url} - is the server running?
-                                    </div>`);
+        // Returns false and explains itself when the request can't be made
+        function readyToSend(blob, target) {
+            if (!getKey()) {
+                $(target).html(alertHtml("Enter your Groq API key above first."))
+                return false
+            }
+            if (blob.size > MAX_BYTES) {
+                $(target).html(alertHtml(
+                    `File is ${(blob.size / 1024 / 1024).toFixed(1)} MB - the Groq free tier accepts up to 25 MB. ` +
+                    `Compress it (FLAC is lossless) or trim it first.`))
+                return false
+            }
+            return true
+        }
+
+        $("#apikey").val(getKey())
+
+        $("#savekey").click(function() {
+            var key = $("#apikey").val().trim()
+            storeKey(key)
+            if (key) {
+                checkKey()
+            } else {
+                keyStatus("warning", "No key set.")
             }
         })
+
+        $("#clearkey").click(function() {
+            storeKey("")
+            $("#apikey").val("")
+            keyStatus("secondary", "Key forgotten.")
+        })
+
+        $("#apikey").keydown(function(event) {
+            if (event.code === "Enter") {
+                $("#savekey").click()
+            }
+        })
+
+        // Cheapest way to confirm a key works before anyone records into it
+        function checkKey() {
+            $.ajax({
+                url: `${GROQ_BASE}/models`,
+                headers: { "Authorization": `Bearer ${getKey()}` },
+                timeout: 5000,
+                success: function() {
+                    keyStatus("success", "Key accepted.")
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    keyStatus("danger", errorMessage(jqXHR, textStatus, errorThrown))
+                }
+            })
+        }
+
+        $("#docs").html(`API docs: <a href="https://console.groq.com/docs/speech-to-text">console.groq.com/docs/speech-to-text</a>`)
+
+        if (getKey()) {
+            checkKey()
+        } else {
+            keyStatus("warning", "No key set - paste a Groq API key to start transcribing.")
+        }
+
+        $("#upload").change(function() {
+            var file = this.files[0]
+            if (!file) return;
+            if (!readyToSend(file, "#result")) return;
+            $("#result").text("Processing...")
+            $("#translation").empty()
+            var startTime = new Date().getTime()
+            groqRequest("transcriptions", file, file.name, { responseFormat: "verbose_json" })
+                .done(function (response) {
+                    console.log(response)
+                    $("#result").html(renderTranscript(response, startTime))
+                })
+                .fail(function (jqXHR, textStatus, errorThrown) {
+                    $("#result").html(alertHtml(errorMessage(jqXHR, textStatus, errorThrown)))
+                })
+        });
 
         // Based on https://github.com/mdn/dom-examples/tree/main/media/web-dictaphone
 
@@ -272,6 +397,10 @@
 
         if (navigator.mediaDevices.getUserMedia) {
             console.log('getUserMedia supported.');
+
+            let typing = function(event) {
+                return $(event.target).is("input, select, textarea")
+            }
 
             let start = function() {
                 if (mediaRecorder.state != "recording") {
@@ -291,13 +420,18 @@
 
             $("#record").on("mousedown touchstart", start)
             $(document).keydown(function(event) {
-                if (event.code === 'Space') {
+                // don't hijack the space bar while the key is being pasted in
+                if (event.code === 'Space' && !typing(event)) {
                     start()
                     return false;
                 }
             })
             $(document).on("mouseup touchend", stop)
-            $(document).keyup(stop)
+            $(document).keyup(function(event) {
+                if (!typing(event)) {
+                    stop()
+                }
+            })
 
             let onSuccess = function (stream) {
                 mediaRecorder = new MediaRecorder(stream);
@@ -312,51 +446,31 @@
                         $("#result").text("Audio too short - try speaking for longer")
                         return
                     }
-                    var form = new FormData()
-                    form.append("audio_file", e.data);
+                    if (!readyToSend(e.data, "#result")) return;
+                    var filename = `recording.${extensionFor(e.data, mediaRecorder.mimeType)}`
                     $("#result").text("Processing...")
-                    var startTime = new Date();
-                    $.ajax({
-                        url: "https://asr.cer-sandbox.cloud.edu.au/asr?output=json&vad_filter=true&language=" + $("#language").val(),
-                        data: form,
-                        type: 'POST',
-                        cache: false,
-                        processData: false,
-                        contentType: false,
-                        success: function (response) {
-                            response = JSON.parse(response)
+                    $("#translation").text("Translating...")
+                    var startTime = new Date().getTime();
+                    groqRequest("transcriptions", e.data, filename, { responseFormat: "verbose_json" })
+                        .done(function (response) {
                             console.log(response)
-                            $("#result").html(`
-                                Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                                Detected language: ${response.language}<br>
-                                Transcript: ${response.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
-                            `)
-                        },
-                        error: function(e, textStatus, errorThrown) {
-                            $("#result").text(errorThrown)
-                        }
-                    });
-                    $.ajax({
-                        url: "https://asr.cer-sandbox.cloud.edu.au/asr?output=json&task=translate&vad_filter=true&language=" + $("#language").val(),
-                        data: form,
-                        type: 'POST',
-                        cache: false,
-                        processData: false,
-                        contentType: false,
-                        success: function (response) {
-                            response = JSON.parse(response)
+                            $("#result").html(renderTranscript(response, startTime))
+                        })
+                        .fail(function (jqXHR, textStatus, errorThrown) {
+                            $("#result").html(alertHtml(errorMessage(jqXHR, textStatus, errorThrown)))
+                        })
+                    groqRequest("translations", e.data, filename, { responseFormat: "json" })
+                        .done(function (response) {
                             console.log(response)
                             $("#translation").html(`
                                 Processing time: ${(new Date().getTime() - startTime) / 1000}s<br>
-                                Translation: ${response.text}<br><br>
-                                Raw JSON: <code>${JSON.stringify(response)}</code><br>
+                                Translation: ${escapeHtml(response.text)}<br><br>
+                                Raw JSON: <code>${escapeHtml(JSON.stringify(response))}</code><br>
                             `)
-                        },
-                        error: function(e, textStatus, errorThrown) {
-                            $("#translation").text(errorThrown)
-                        }
-                    });
+                        })
+                        .fail(function (jqXHR, textStatus, errorThrown) {
+                            $("#translation").html(alertHtml(errorMessage(jqXHR, textStatus, errorThrown)))
+                        })
                 }
             }
 
